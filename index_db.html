@@ -27,14 +27,13 @@
 
               var local_storage_key = "local_image";
               var object_to_add = {};
-              object_to_add[local_storage_key] = canvas.toDataURL("image/png");
+              object_to_add[local_storage_key]    = canvas.toDataURL("image/png");
+              object_to_add[StorageDemo.key_path] = this.storage_demo_image_index;
+
               var request = StorageDemo.database.transaction( StorageDemo.object_store_name, "readwrite")
                                                 .objectStore( StorageDemo.object_store_name )
-                                                .add(object_to_add);
+                                                .put( object_to_add );
 
-
-              // Here we will keep an array of image keys that successfully loaded
-              StorageDemo.downloaded_image_keys.push(local_storage_key);
               request.onsuccess = function( event ) {
                 handle_image_callback(true);
               }
@@ -48,7 +47,7 @@
             }
             // Important to set Cross Origin to prevent a tainted canvas exception
             image.crossOrigin = "Anonymous";
-            image.src = ("http:192.168.25.13:4567/images/" + image_index);
+            image.src = ( StorageDemo.api_address + image_index);
           };
         }
 
@@ -103,13 +102,14 @@
         }
         return {
           initialize: function() {
+            StorageDemo.api_address               = "http://localhost:4567/images/"
             StorageDemo.number_of_images_to_store = 4;
             StorageDemo.image_callbacks_received  = 0;
-            StorageDemo.downloaded_image_keys     = [];
             StorageDemo.database_name             = "StorageDemoDB";
             StorageDemo.object_store_name         = "ImageStore";
+            StorageDemo.key_path                  = "image_index"
 
-            indexedDB.deleteDatabase("StorageDemoDB");
+            // indexedDB.deleteDatabase("StorageDemoDB");
 
             var db_request = indexedDB.open( StorageDemo.database_name, 1 );
             db_request.onerror = function( event ) {
@@ -123,7 +123,7 @@
             db_request.onupgradeneeded = function ( event ) {
               console.log("!!!!!!! DB UPGRADE!");
               var db    = event.target.result;
-              var store = db.createObjectStore( StorageDemo.object_store_name, { autoIncrement : true } );
+              var store = db.createObjectStore( StorageDemo.object_store_name, {keyPath: StorageDemo.key_path} );
             }
           }
         }
