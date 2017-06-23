@@ -47,7 +47,7 @@
             }
             // Important to set Cross Origin to prevent a tainted canvas exception
             image.crossOrigin = "Anonymous";
-            image.src = ( StorageDemo.api_address + image_index);
+            image.src = ( StorageDemo.api_address + image.storage_demo_image_index);
           };
         }
 
@@ -103,7 +103,7 @@
         return {
           initialize: function() {
             StorageDemo.api_address               = "http://localhost:4567/images/"
-            StorageDemo.number_of_images_to_store = 4;
+            StorageDemo.number_of_images_to_store = 8;
             StorageDemo.image_callbacks_received  = 0;
             StorageDemo.database_name             = "StorageDemoDB";
             StorageDemo.object_store_name         = "ImageStore";
