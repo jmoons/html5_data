@@ -1,0 +1,101 @@
+<!doctype html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Local Storage Tester</title>
+
+    <style>
+
+    </style>
+    <script type="text/javascript">
+      var StorageDemo = (function() {
+        function download_and_store_images() {
+          for (var image_index = 1; image_index <= StorageDemo.number_of_images_to_store; image_index++) {
+            var canvas          = document.createElement("canvas");
+            var canvas_context  = canvas.getContext("2d");
+            var image           = new Image();
+
+            // Store our index on the image object so that we can reference it in the onload (no offense closures)
+            image.storage_demo_image_index = image_index;
+
+            // Set up handler for image load before setting source so cached images will also trigger
+            image.onload = function() {
+              canvas.width  = this.width;
+              canvas.height = this.height;
+              canvas_context.drawImage( this, 0, 0 );
+
+              var local_storage_key = "local_image_" + this.storage_demo_image_index;
+              localStorage.setItem( local_storage_key, canvas.toDataURL("image/png") );
+
+              // Here we will keep an array of image keys that successfully loaded
+              StorageDemo.downloaded_image_keys.push(local_storage_key);
+              handle_image_callback(true);
+
+            }
+            image.onerror = function() {
+              // You could store a default image here
+              handle_image_callback(false);
+            }
+            // Important to set Cross Origin to prevent a tainted canvas exception
+            image.crossOrigin = "Anonymous";
+            image.src = ("http:192.168.25.13:4567/images/" + image_index);
+          };
+        }
+
+        function handle_image_callback(boolean_status) {
+          // Mechanism to keep track of all image callbacks
+          // Delay execution until all image callbacks have fired
+          StorageDemo.image_callbacks_received += 1;
+
+          if ( StorageDemo.image_callbacks_received == StorageDemo.number_of_images_to_store ) {
+            // All images have loaded (or errored)
+            initialize_rendering();
+          };
+        }
+
+        function initialize_rendering(image_index) {
+
+          // If we are asked to render an index that does not exist, rollover back to the start
+          if ( (image_index >= StorageDemo.downloaded_image_keys.length) || (image_index === undefined) ) {
+            image_index = 0;
+          };
+          render_image( StorageDemo.downloaded_image_keys[image_index] );
+          setTimeout( initialize_rendering, 5000, image_index += 1);
+        }
+
+        function render_image(image_key) {
+          // Render the image
+          var image_to_render = localStorage.getItem( image_key );
+          var image_tag       = '<image src=' + image_to_render + '>'
+          document.getElementById("container").innerHTML = image_tag;
+        }
+        return {
+          initialize: function() {
+            StorageDemo.number_of_images_to_store = 40;
+            StorageDemo.image_callbacks_received  = 0;
+            StorageDemo.downloaded_image_keys     = [];
+
+            download_and_store_images();
+          }
+        }
+      })();
+    </script>
+    <script type="text/javascript">
+      document.onreadystatechange = function () {
+        if (document.readyState == "interactive") {
+
+          StorageDemo.initialize();
+
+        }
+
+      }
+    </script>
+
+  </head>
+
+  <body style="background-color: #FFF;">
+    <div id="container">
+    </div>
+  </body>
+</html>
