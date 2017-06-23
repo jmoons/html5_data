@@ -6,7 +6,7 @@ def normalize_value(input_number)
   input_number = input_number.abs if input_number < 0
 
   while !BASELINE_RANGE.include?(input_number)
-    input_number -= 4
+    input_number -= BASELINE_RANGE.last
   end
   input_number
 end
