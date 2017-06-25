@@ -1,9 +1,19 @@
 require 'sinatra'
 
+# We have four images we can serve up. If we add more,
+# update BASELIN_RANGE accordingly
 BASELINE_RANGE = (1 .. 4)
+
 def normalize_value(input_number)
-  return input_number if input_number == 0
-  input_number = input_number.abs if input_number < 0
+
+  # A bit cheeky here. No matter what value is sent, split
+  # the string into individual digits, grab the last, and
+  # convert into an int. This will save some cycles on
+  # reducing to a value that falls within the BASELINE_RANGE
+  # later on.
+  input_number = input_number.split('').last.to_i
+
+  return 1 if input_number == 0
 
   while !BASELINE_RANGE.include?(input_number)
     input_number -= BASELINE_RANGE.last
@@ -26,13 +36,9 @@ get '/' do
 end
 
 get '/images/:name' do
-  # matches "GET /hello/foo" and "GET /hello/bar"
-  # params['name'] is 'foo' or 'bar'
-  # "Hello #{params['name']}!"
-  files_to_send     = [ "1.jpg", "2.jpg", "3.jpg", "4.jpg" ]
-  normalized_params = normalize_value( params[:name].to_i )
+
+  normalized_params = normalize_value( params[:name] )
   puts "Sending: #{normalized_params}.jpg for Request: #{params[:name]}"
   send_file "#{normalized_params}.jpg"
-  # send_file files_to_send[ normalized_params - 1 ]
 
 end
