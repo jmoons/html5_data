@@ -1,3 +1,7 @@
+# NOTE: Sinatra by default launches in loopback (localhost) mode
+# To launch in non-loopback mode, launch sinatra with
+# APP_ENV=production ruby sinatra_server.rb
+
 require 'sinatra'
 
 # We have four images we can serve up. If we add more,
