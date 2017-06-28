@@ -12,34 +12,14 @@
       var StorageDemo = (function() {
         function download_and_store_images() {
           for (var image_index = 1; image_index <= StorageDemo.number_of_images_to_store; image_index++) {
-            var canvas          = document.createElement("canvas");
-            var canvas_context  = canvas.getContext("2d");
-            var image           = new Image();
+            var image = new Image();
 
             // Store our index on the image object so that we can reference it in the onload (no offense closures)
             image.storage_demo_image_index = image_index;
 
             // Set up handler for image load before setting source so cached images will also trigger
             image.onload = function() {
-              canvas.width  = this.width;
-              canvas.height = this.height;
-              canvas_context.drawImage( this, 0, 0 );
-
-              var local_storage_key = "local_image";
-              var object_to_add = {};
-              object_to_add[local_storage_key]    = canvas.toDataURL("image/png");
-              object_to_add[StorageDemo.key_path] = this.storage_demo_image_index;
-
-              var request = StorageDemo.database.transaction( StorageDemo.object_store_name, "readwrite")
-                                                .objectStore( StorageDemo.object_store_name )
-                                                .put( object_to_add );
-
-              request.onsuccess = function( event ) {
-                handle_image_callback(true);
-              }
-              request.onerror = function( event ) {
-                console.log("Image not in database!");
-              }
+              store_image_in_database( this );
             }
             image.onerror = function() {
               // You could store a default image here
@@ -51,63 +31,86 @@
           };
         }
 
+        function store_image_in_database( image_to_store ) {
+
+          var canvas_context  = StorageDemo.canvas_to_use_for_images.getContext("2d");
+
+          StorageDemo.canvas_to_use_for_images.width  = image_to_store.width;
+          StorageDemo.canvas_to_use_for_images.height = image_to_store.height;
+          canvas_context.drawImage( image_to_store, 0, 0 );
+
+          var object_to_add = {};
+          object_to_add[ StorageDemo.image_key_in_db ]  = StorageDemo.canvas_to_use_for_images.toDataURL("image/png");
+          object_to_add[StorageDemo.key_path]           = image_to_store.storage_demo_image_index;
+
+          var transaction           = StorageDemo.database.transaction( StorageDemo.object_store_name, "readwrite" );
+          var object_store          = transaction.objectStore( StorageDemo.object_store_name );
+          var object_store_request  = object_store.put( object_to_add );
+
+          // Save the index of this image so that we can look up which images
+          // were successfully stored later on
+          object_store_request.storage_demo_image_index = image_to_store.storage_demo_image_index;
+
+
+          object_store_request.onsuccess = function( event ) {
+            StorageDemo.stored_image_keys.push( this.storage_demo_image_index );
+            handle_image_callback(true);
+          }
+          object_store_request.onerror = function( event ) {
+            console.log("Image not in database!");
+          }
+        }
+
         function handle_image_callback(boolean_status) {
           // Mechanism to keep track of all image callbacks
           // Delay execution until all image callbacks have fired
           StorageDemo.image_callbacks_received += 1;
 
           if ( StorageDemo.image_callbacks_received == StorageDemo.number_of_images_to_store ) {
-            // All images have loaded (or errored)
 
-            var transaction   = StorageDemo.database.transaction( StorageDemo.object_store_name, "readonly" );
-            var object_store  = transaction.objectStore( StorageDemo.object_store_name );
-
-            if ('getAll' in object_store) {
-              // IDBObjectStore.getAll() will return the full set of items in our store.
-              object_store.getAll().onsuccess = function(event) {
-                initialize_rendering( event.target.result );
-              };
-            } else {
-              // Fallback to the traditional cursor approach if getAll isn't supported.
-              var image_collection_to_render = [];
-              object_store.openCursor().onsuccess = function(event) {
-                var cursor = event.target.result;
-                if (cursor) {
-                  image_collection_to_render.push(cursor.value);
-                  cursor.continue();
-                } else {
-                  
-                }
-                initialize_rendering( image_collection_to_render );
-              };
-            }
+            initialize_rendering();
 
           };
         }
 
-        function initialize_rendering(image_collection_to_render, image_index) {
+        function initialize_rendering( image_index ) {
 
-          if ( (image_index >= image_collection_to_render.length) || (image_index === undefined) ) {
+          if ( (image_index >= StorageDemo.stored_image_keys.length) || (image_index === undefined) ) {
             image_index = 0;
           };
 
-          render_image( image_collection_to_render[image_index] );
-          setTimeout( initialize_rendering, 5000, image_collection_to_render, image_index += 1 );
+          var transaction           = StorageDemo.database.transaction( StorageDemo.object_store_name, "readonly" );
+          var object_store          = transaction.objectStore( StorageDemo.object_store_name );
+          var object_store_request  = object_store.get( StorageDemo.stored_image_keys[image_index] );
+
+          object_store_request.onsuccess = function( event ) {
+            console.log("DB load Success");
+            render_image( event.target.result );
+            setTimeout( initialize_rendering, 5000, image_index += 1 );
+          }
+          object_store_request.onerror = function( event ) {
+            console.log("DB LOAD FAILED");
+            initialize_rendering( image_index += 1 );
+          }
+
         }
 
         function render_image(image_object) {
           // Render the image
-          var image_tag       = '<image src=' + image_object["local_image"] + '>'
+          var image_tag       = '<image src=' + image_object[ StorageDemo.image_key_in_db ] + '>'
           document.getElementById("container").innerHTML = image_tag;
         }
         return {
           initialize: function() {
-            StorageDemo.api_address               = "http://localhost:4567/images/"
+            StorageDemo.api_address               = "http://192.168.25.13:4567/images/"
             StorageDemo.number_of_images_to_store = 8;
             StorageDemo.image_callbacks_received  = 0;
             StorageDemo.database_name             = "StorageDemoDB";
             StorageDemo.object_store_name         = "ImageStore";
-            StorageDemo.key_path                  = "image_index"
+            StorageDemo.key_path                  = "image_index";
+            StorageDemo.stored_image_keys         = [];
+            StorageDemo.image_key_in_db           = "local_image"
+            StorageDemo.canvas_to_use_for_images  = document.createElement("canvas");
 
             // indexedDB.deleteDatabase("StorageDemoDB");
 
