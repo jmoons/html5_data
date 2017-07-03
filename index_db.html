@@ -31,6 +31,24 @@
           };
         }
 
+        function get_stored_images() {
+          var transaction           = StorageDemo.database.transaction( StorageDemo.object_store_name, "readonly" );
+          var object_store          = transaction.objectStore( StorageDemo.object_store_name );
+          var object_store_request  = object_store.getAll();
+
+          object_store_request.onsuccess = function( event ) {
+            console.log("DB load GetAll() Success");
+            event.target.result.forEach( function(retrieved_image) {
+              StorageDemo.stored_image_keys.push( retrieved_image[StorageDemo.key_path] );
+            });
+
+            initialize_rendering();
+          }
+          object_store_request.onerror = function( event ) {
+            console.log("DB LOAD GetAll() FAILED");
+          }
+        }
+
         function store_image_in_database( image_to_store ) {
 
           var canvas_context  = StorageDemo.canvas_to_use_for_images.getContext("2d");
@@ -58,6 +76,10 @@
           }
           object_store_request.onerror = function( event ) {
             console.log("Image not in database!");
+            // Still increment our image_callback. In the onsuccess handler,
+            // we add the index of images successfully stored and that is what 
+            // we base our rendering logic off of.
+            handle_image_callback(true);
           }
         }
 
@@ -111,6 +133,7 @@
             StorageDemo.stored_image_keys         = [];
             StorageDemo.image_key_in_db           = "local_image"
             StorageDemo.canvas_to_use_for_images  = document.createElement("canvas");
+            StorageDemo.pull_from_remote          = false;
 
             // indexedDB.deleteDatabase("StorageDemoDB");
 
@@ -121,7 +144,12 @@
             db_request.onsuccess = function( event ) {
               console.log("!!!!!!! DB Success");
               StorageDemo.database = event.target.result;
-              download_and_store_images();
+              if ( StorageDemo.pull_from_remote ) {
+                download_and_store_images();
+              } else {
+                get_stored_images();
+              };
+
             }
             db_request.onupgradeneeded = function ( event ) {
               console.log("!!!!!!! DB UPGRADE!");
