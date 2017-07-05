@@ -34,19 +34,30 @@
         function get_stored_images() {
           var transaction           = StorageDemo.database.transaction( StorageDemo.object_store_name, "readonly" );
           var object_store          = transaction.objectStore( StorageDemo.object_store_name );
-          var object_store_request  = object_store.getAll();
 
-          object_store_request.onsuccess = function( event ) {
-            console.log("DB load GetAll() Success");
-            event.target.result.forEach( function(retrieved_image) {
-              StorageDemo.stored_image_keys.push( retrieved_image[StorageDemo.key_path] );
-            });
+            if ('getAll' in object_store) {
+              // IDBObjectStore.getAll() will return the full set of items in our store.
+              object_store.getAll().onsuccess = function(event) {
+                console.log("DB load GetAll() Success");
+                event.target.result.forEach( function(retrieved_image) {
+                  StorageDemo.stored_image_keys.push( retrieved_image[StorageDemo.key_path] );
+                });
 
-            initialize_rendering();
-          }
-          object_store_request.onerror = function( event ) {
-            console.log("DB LOAD GetAll() FAILED");
-          }
+                initialize_rendering();
+              };
+            } else {
+              // Fallback to the traditional cursor approach if getAll isn't supported.
+              object_store.openCursor().onsuccess = function(event) {
+                var cursor = event.target.result;
+                if (cursor) {
+                  console.log("DB load Cursor Success");
+                  StorageDemo.stored_image_keys.push( cursor.value[StorageDemo.key_path] );
+                  cursor.continue();
+                } else {
+                  initialize_rendering();
+                }
+              };
+            }
         }
 
         function store_image_in_database( image_to_store ) {
